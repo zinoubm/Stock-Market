@@ -1,0 +1,13 @@
+.app-container{
+    display: flex;
+    height: 100vh;
+}
+.right-slider{
+    background-color: aqua;
+    width: 20%;
+    padding: 0.6em;
+}
+.main{
+    background-color: red;
+    width: 80%;
+}
