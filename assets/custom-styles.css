@@ -1,13 +1,46 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600&display=swap');
+
+h1, h2, h3, h4, h5, h6{
+    font-family: 'Poppins', sans-serif;
+}
 .app-container{
     display: flex;
-    height: 100vh;
+    color: white;
 }
 .right-slider{
-    background-color: aqua;
+    background-color: #1d303a;
+    color: rgb(241, 241, 241);
     width: 20%;
     padding: 0.6em;
 }
 .main{
-    background-color: red;
+    background-color: #19333f;
     width: 80%;
+}
+#out1{
+    display: none;
+}
+#out2{
+    display: none;
+}
+.gTDjPF{
+    background-color: #FFED00 !important;
+}
+.graph{
+    margin: 0.2em;
+    border-radius: 25px;
+    background-color: #1f292e;
+}
+.Select-menu-outer{
+    color: #2e2e2ed9;
+}
+
+.moving-averages{
+    width: 100%;
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.moving-average-element{
+width: 48%;
 }

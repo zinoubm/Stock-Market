@@ -1,103 +1,18 @@
-import os
+from src.constants import *
+from src.figures import *
+from src.controller import Controller
+from src.functions.functions import functions
+
+
 from dash import Dash, dcc, html, Input, Output
-import dash_daq as daq
 from dash.exceptions import PreventUpdate
-import requests
-from dotenv import load_dotenv
-import pandas as pd
-from dateutil import parser
-import plotly.graph_objects as go
-from plotly.graph_objs import Layout
+import dash_daq as daq
 
 
-load_dotenv()
-API_KEY = os.getenv("API_KEY")
-layout = {
-    "paper_bgcolor": "rgb(31, 41, 46)",
-    "plot_bgcolor": "rgba(0,0,0,0)",
-    "font_color": "rgb(255, 255, 255)",
-    "font": {
-        "family": "Courier New, monospace",
-        "size": 14,
-        "color": "#fff",
-    },
-}
+import plotly.express as px
+
 
 app = Dash(__name__)
-
-
-def generate_candlestick_chart(df):
-    layout = Layout(
-        paper_bgcolor="rgb(31, 41, 46)",
-        plot_bgcolor="rgba(0,0,0,0)",
-        font_color="rgb(255, 255, 255)",
-        font={"family": "Courier New, monospace", "size": 14, "color": "#fff"},
-    )
-    fig = go.Figure(
-        data=[
-            go.Candlestick(
-                x=df.index,
-                open=df["open"],
-                high=df["high"],
-                low=df["low"],
-                close=df["close"],
-            )
-        ],
-        layout=layout,
-    )
-
-    return fig
-
-
-class Controller:
-    def __init__(self):
-        self.function = None
-        self.symbol = None
-        self.interval = None
-        self.api_key = None
-        self.adjusted = None
-        self.compact = None
-        self.data = None
-        self.window = None
-
-    def get_data(self):
-        if self.adjusted:
-            adjusted = "true"
-        else:
-            adjusted = "false"
-
-        if self.compact:
-            compact = "compact"
-        else:
-            compact = "full"
-
-        url = f"https://www.alphavantage.co/query?function={self.function}&symbol={self.symbol}&interval={self.interval}min&apikey={self.api_key}&adjusted={adjusted}&outputsize={compact}"
-        print(url)
-        r = requests.get(url)
-        data = r.json()
-        self.data = self.preprocess_data(data)
-
-    def preprocess_data(self, df):
-        df = pd.DataFrame.from_dict(df["Time Series (5min)"], orient="index")
-        df = df.rename(
-            columns={
-                "1. open": "open",
-                "2. high": "high",
-                "3. low": "low",
-                "4. close": "close",
-                "5. volume": "vloume",
-            }
-        )
-
-        for col in df.columns:
-            df[col] = pd.to_numeric(df[col])
-
-        df_index = df.index.map(lambda x: parser.parse(x))
-        df.index = df_index
-        return df
-
-    def __str__(self):
-        return f"Class::Controller\nfunction::{self.function}\nsymbol::{self.symbol}\ninterval::{self.interval}\nadjusted::{self.adjusted}\noutputsize::{self.compact}\nwindow::{self.window}"
 
 
 app_controller = Controller()
@@ -150,10 +65,38 @@ app.layout = html.Div(
             children=[
                 html.Div(id="out1"),
                 html.Div(id="out2"),
-                # dcc.Graph(id="candle-candlestick-graph"),
+                dcc.Markdown(markdown),
+                html.H2("Candle Stick Graph"),
                 dcc.Graph(
+                    className="graph",
                     figure={"layout": layout},
-                    id="candle-candlestick-graph",
+                    id="candlestick-graph",
+                ),
+                html.H2("Moving Averages"),
+                html.Div(
+                    className="moving-averages",
+                    children=[
+                        dcc.Graph(
+                            className="moving-average-element graph",
+                            figure={"layout": layout},
+                            id="moving-average-open-graph",
+                        ),
+                        dcc.Graph(
+                            className="moving-average-element graph",
+                            figure={"layout": layout},
+                            id="moving-average-high-graph",
+                        ),
+                        dcc.Graph(
+                            className="moving-average-element graph",
+                            figure={"layout": layout},
+                            id="moving-average-low-graph",
+                        ),
+                        dcc.Graph(
+                            className="moving-average-element graph",
+                            figure={"layout": layout},
+                            id="moving-average-close-graph",
+                        ),
+                    ],
                 ),
             ],
         ),
@@ -171,26 +114,59 @@ app.layout = html.Div(
     Input("window-slider", "value"),
 )
 def set_app_controller_params(function, symbol, interval, adjusted, compact, window):
-    app_controller.function = function
-    app_controller.symbol = symbol
-    app_controller.interval = interval
-    app_controller.adjusted = adjusted
-    app_controller.compact = compact
-    app_controller.window = window
+    app_controller.params["function"] = function
+    app_controller.params["symbol"] = symbol
+    app_controller.params["interval"] = interval
+    app_controller.params["adjusted"] = adjusted
+    app_controller.params["compact"] = compact
+    app_controller.params["window"] = window
+    app_controller.url_handler = functions[function]()
 
     return app_controller.__str__()
 
 
 @app.callback(
-    Output("candle-candlestick-graph", "figure"),
-    Input("get-data", "n_clicks"),
+    [
+        Output("candlestick-graph", "figure"),
+        Output("moving-average-open-graph", "figure"),
+        Output("moving-average-high-graph", "figure"),
+        Output("moving-average-low-graph", "figure"),
+        Output("moving-average-close-graph", "figure"),
+    ],
+    [Input("get-data", "n_clicks")],
 )
 def get_data(n_clicks):
     if n_clicks is None:
         raise PreventUpdate
     app_controller.get_data()
 
-    return generate_candlestick_chart(app_controller.data)
+    return (
+        generate_candlestick_chart(app_controller.data),
+        generate_time_series_plot(
+            app_controller.series_open, 250, "Open with moving averages"
+        ),
+        generate_time_series_plot(
+            app_controller.series_high, 250, "High with moving averages"
+        ),
+        generate_time_series_plot(
+            app_controller.series_low, 250, "Low with moving averages"
+        ),
+        generate_time_series_plot(
+            app_controller.series_close, 250, "Close with moving averages"
+        ),
+    )
+
+
+# Disable Sliders if kernel not in the given list
+@app.callback(
+    [
+        Output("time-interval-slider", "disabled"),
+        Output("adjusted-switch", "disabled"),
+    ],
+    [Input("function-dropdown", "value")],
+)
+def disable_slider_param_degree(kernel):
+    return kernel != "TIME_SERIES_INTRADAY", kernel != "TIME_SERIES_INTRADAY"
 
 
 if __name__ == "__main__":
